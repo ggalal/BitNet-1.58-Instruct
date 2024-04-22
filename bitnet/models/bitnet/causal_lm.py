@@ -66,11 +66,6 @@ _CONFIG_FOR_DOC = "BitnetConfig"
 
 from torch import nn
 
-def orig_weight_quant(weight):
-    scale =  1 / weight.abs().mean().clamp(min=1e-5)
-    result = (weight * scale).round().clamp(-1, 1) / scale
-    return result
-
 def weight_quant(weight):
     beta =  1 / weight.abs().mean().clamp(min=1e-5)
     result = (weight * beta).round().clamp(-1, 1)
@@ -99,14 +94,12 @@ class BitLinear(nn.Linear):
         self.input_bits = input_bits
 
     def forward(self, input):
-        w_quant = orig_weight_quant(self.weight)
-        # w_quant, beta = weight_quant(self.weight)
+        w_quant, beta = weight_quant(self.weight)
         
         quant_input = input + (activation_quant(input, self.input_bits) - input).detach()
         quant_weight = self.weight + (w_quant - self.weight).detach()
 
-        out = nn.functional.linear(quant_input, quant_weight)
-        # out = nn.functional.linear(quant_input, quant_weight) / beta
+        out = nn.functional.linear(quant_input, quant_weight) / beta
         if not self.bias is None:
             out += self.bias.view(1, -1).expand_as(out)
 
